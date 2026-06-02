@@ -2,11 +2,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Modal from '@/components/ui/Modal'
-import { useCriarRecurso } from '@/hooks/useCustos'
+import { useCriarRecurso, usePerfisColaboradores } from '@/hooks/useCustos'
 
 const schema = z.object({
-  funcao: z.string().min(1, 'Função é obrigatória'),
-  hhPlanejado: z.coerce.number().min(0),
+  idPerfilColaborador: z.coerce.number().min(1, 'Selecione uma função'),
+  hh_planejada: z.coerce.number().min(0),
   custoPlanHH: z.coerce.number().min(0),
   hhReal: z.coerce.number().min(0),
   custoRealHH: z.coerce.number().min(0),
@@ -23,14 +23,25 @@ interface Props {
 
 export default function AdicionarRecursoModal({ open, onClose, projetoId, atividadeId }: Props) {
   const criarRecurso = useCriarRecurso(projetoId, atividadeId)
+  const { data: perfis = [], isLoading: loadingPerfis } = usePerfisColaboradores()
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { hhPlanejado: 0, custoPlanHH: 0, hhReal: 0, custoRealHH: 0 },
+    defaultValues: { idPerfilColaborador: 0, hh_planejada: 0, custoPlanHH: 0, hhReal: 0, custoRealHH: 0 },
   })
 
   const onSubmit = async (data: FormData) => {
-    await criarRecurso.mutateAsync(data)
+    // Backend aceita: idPerfilColaborador + hh_planejada
+    // custoPlanHH, hhReal, custoRealHH são calculados (diário de obra / histórico)
+    await criarRecurso.mutateAsync({
+      idPerfilColaborador: data.idPerfilColaborador,
+      hh_planejada: data.hh_planejada,
+    })
     reset()
     onClose()
   }
@@ -40,18 +51,36 @@ export default function AdicionarRecursoModal({ open, onClose, projetoId, ativid
   return (
     <Modal open={open} onClose={handleClose} title="Adicionar Recurso Humano (HH)">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
+        {/* Função (select do banco — nome_cargo de PerfisColaboradores) */}
         <div>
           <label className="block text-sm font-medium text-text-primary mb-1">
             Função <span className="text-danger">*</span>
           </label>
-          <input {...register('funcao')} className="input-field" placeholder="Pedreiro, Engenheiro..." />
-          {errors.funcao && <p className="text-danger text-xs mt-1">{errors.funcao.message}</p>}
+          <select
+            {...register('idPerfilColaborador')}
+            className="input-field"
+            disabled={loadingPerfis}
+          >
+            <option value={0}>
+              {loadingPerfis ? 'Carregando...' : 'Pedreiro, Engenheiro...'}
+            </option>
+            {perfis.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome_cargo}
+              </option>
+            ))}
+          </select>
+          {errors.idPerfilColaborador && (
+            <p className="text-danger text-xs mt-1">{errors.idPerfilColaborador.message}</p>
+          )}
         </div>
 
+        {/* HH Planejado + Custo Plan. (R$/HH) */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">HH Planejado</label>
-            <input type="number" step="0.01" min="0" {...register('hhPlanejado')} className="input-field" />
+            <input type="number" step="0.01" min="0" {...register('hh_planejada')} className="input-field" />
           </div>
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Custo Plan. (R$/HH)</label>
@@ -59,6 +88,7 @@ export default function AdicionarRecursoModal({ open, onClose, projetoId, ativid
           </div>
         </div>
 
+        {/* HH Real + Custo Real (R$/HH) */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">HH Real</label>

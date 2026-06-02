@@ -1,63 +1,85 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { custosService } from '@/services/custos.service'
-import type { NovoItemMaterial, NovoRecursoHH } from '@/types/custo'
+import { materiaisService } from '@/services/materiais.service'
+import { perfisColaboradoresService } from '@/services/perfisColaboradores.service'
+import type { NovoMateriaisPlanejado, NovoPerfilPlanejado } from '@/types/custo'
+import api from '@/services/api'
 
-export function useItens(projetoId: string, atividadeId: string) {
+// ── Materiais planejados ────────────────────────────────────────────────────
+
+export function useItens(_projetoId: string, atividadeId: string) {
   return useQuery({
-    queryKey: ['itens', projetoId, atividadeId],
-    queryFn: () => custosService.listarItens(projetoId, atividadeId),
-    enabled: !!projetoId && !!atividadeId,
+    queryKey: ['itens', atividadeId],
+    queryFn: () => custosService.listarMateriaisPlanejado(atividadeId),
+    enabled: !!atividadeId,
   })
 }
 
-export function useCriarItem(projetoId: string, atividadeId: string) {
+export function useCriarItem(_projetoId: string, atividadeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (dados: NovoItemMaterial) =>
-      custosService.criarItem(projetoId, atividadeId, dados),
+    mutationFn: (dados: NovoMateriaisPlanejado) =>
+      custosService.adicionarMaterialPlanejado(atividadeId, dados),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['itens', projetoId, atividadeId] })
+      queryClient.invalidateQueries({ queryKey: ['itens', atividadeId] })
     },
   })
 }
 
-export function useExcluirItem(projetoId: string, atividadeId: string) {
+export function useExcluirItem(_projetoId: string, atividadeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (itemId: string) =>
-      custosService.excluirItem(projetoId, atividadeId, itemId),
+    mutationFn: (itemId: string | number) =>
+      api.delete(`/atividades/materiaisPlanejado/${itemId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['itens', projetoId, atividadeId] })
+      queryClient.invalidateQueries({ queryKey: ['itens', atividadeId] })
     },
   })
 }
 
-export function useRecursos(projetoId: string, atividadeId: string) {
+// ── Recursos HH planejados ──────────────────────────────────────────────────
+
+export function useRecursos(_projetoId: string, atividadeId: string) {
   return useQuery({
-    queryKey: ['recursos', projetoId, atividadeId],
-    enabled: !!projetoId && !!atividadeId,
-    queryFn: () => custosService.listarRecursos(projetoId, atividadeId),
+    queryKey: ['recursos', atividadeId],
+    queryFn: () => custosService.listarPerfisPlanejado(atividadeId),
+    enabled: !!atividadeId,
   })
 }
 
-export function useCriarRecurso(projetoId: string, atividadeId: string) {
+export function useCriarRecurso(_projetoId: string, atividadeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (dados: NovoRecursoHH) =>
-      custosService.criarRecurso(projetoId, atividadeId, dados),
+    mutationFn: (dados: NovoPerfilPlanejado) =>
+      custosService.adicionarPerfilPlanejado(atividadeId, dados),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recursos', projetoId, atividadeId] })
+      queryClient.invalidateQueries({ queryKey: ['recursos', atividadeId] })
     },
   })
 }
 
-export function useExcluirRecurso(projetoId: string, atividadeId: string) {
+export function useExcluirRecurso(_projetoId: string, atividadeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (recursoId: string) =>
-      custosService.excluirRecurso(projetoId, atividadeId, recursoId),
+    mutationFn: (_recursoId: string) => Promise.resolve(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recursos', projetoId, atividadeId] })
+      queryClient.invalidateQueries({ queryKey: ['recursos', atividadeId] })
     },
+  })
+}
+
+// ── Listas para os selects dos modais ──────────────────────────────────────
+
+export function useMateriais() {
+  return useQuery({
+    queryKey: ['materiais'],
+    queryFn: () => materiaisService.listar(),
+  })
+}
+
+export function usePerfisColaboradores() {
+  return useQuery({
+    queryKey: ['perfisColaboradores'],
+    queryFn: () => perfisColaboradoresService.listar(),
   })
 }

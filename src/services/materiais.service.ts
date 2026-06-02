@@ -5,6 +5,7 @@ export interface Material {
   nome_material: string
   unidade_medida: string
   valor_unitario_cotado: number | null
+  valor_unitario_adquirido: number | null
   descricao?: string | null
   codigo_produto?: string | null
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Plus, Trash2, TrendingDown } from 'lucide-react'
 import { useProjeto, useAtividades } from '@/hooks/useProjetos'
 import { useItens, useRecursos, useExcluirItem, useExcluirRecurso } from '@/hooks/useCustos'
@@ -6,6 +6,19 @@ import AdicionarItemModal from '@/pages/components/AdicionarItemModal'
 import AdicionarRecursoModal from '@/pages/components/AdicionarRecursoModal'
 import { formatCurrency } from '@/utils/formatters'
 import type { Atividade } from '@/types/projeto'
+
+
+// Hook que retorna os totais de uma atividade (materiais + HH)
+function useTotaisAtividade(projetoId: string, atividadeId: string) {
+  const { data: itens = [] } = useItens(projetoId, atividadeId)
+  const { data: recursos = [] } = useRecursos(projetoId, atividadeId)
+  return {
+    matPlan: itens.reduce((s, i) => s + i.custoPlanTotal, 0),
+    matReal: itens.reduce((s, i) => s + i.custoReal, 0),
+    hhPlan: recursos.reduce((s, r) => s + r.custoPlanTotal, 0),
+    hhReal: recursos.reduce((s, r) => s + r.custoRealTotal, 0),
+  }
+}
 
 function DetalheAtividade({ projetoId, atividade }: { projetoId: string; atividade: Atividade }) {
   const [modalItem, setModalItem] = useState(false)
@@ -137,17 +150,28 @@ function DetalheAtividade({ projetoId, atividade }: { projetoId: string; ativida
   )
 }
 
-function LinhaAtividade({ atividade, projetoId, projetoNome }: { atividade: Atividade; projetoId: string; projetoNome: string }) {
+// Linha da tabela — também contribui para os totais dos cards via onTotais
+function LinhaAtividade({
+  atividade,
+  projetoId,
+  projetoNome,
+  onTotais,
+}: {
+  atividade: Atividade
+  projetoId: string
+  projetoNome: string
+  onTotais?: (t: { matPlan: number; matReal: number; hhPlan: number; hhReal: number }) => void
+}) {
   const [expandido, setExpandido] = useState(false)
-  const { data: itens = [] } = useItens(projetoId, atividade.id)
-  const { data: recursos = [] } = useRecursos(projetoId, atividade.id)
+  const totais = useTotaisAtividade(projetoId, atividade.id)
 
-  const matPlan = itens.reduce((s, i) => s + i.custoPlanTotal, 0)
-  const matReal = itens.reduce((s, i) => s + i.custoReal, 0)
-  const hhPlan = recursos.reduce((s, r) => s + r.custoPlanTotal, 0)
-  const hhReal = recursos.reduce((s, r) => s + r.custoRealTotal, 0)
-  const totalPlan = matPlan + hhPlan
-  const totalReal = matReal + hhReal
+  // Reporta os totais para o pai toda vez que mudarem
+   useEffect(() => {
+    onTotais?.(totais)
+  }, [totais.matPlan, totais.matReal, totais.hhPlan, totais.hhReal])
+
+  const totalPlan = totais.matPlan + totais.hhPlan
+  const totalReal = totais.matReal + totais.hhReal
   const variacao = totalReal - totalPlan
   const variacaoPerc = totalPlan > 0 ? (variacao / totalPlan) * 100 : 0
   const varClass = variacao > 0 ? 'text-danger' : variacao < 0 ? 'text-success' : 'text-text-secondary'
@@ -166,11 +190,11 @@ function LinhaAtividade({ atividade, projetoId, projetoNome }: { atividade: Ativ
             </div>
           </div>
         </td>
-        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(matPlan)}</td>
-        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(hhPlan)}</td>
+        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(totais.matPlan)}</td>
+        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(totais.hhPlan)}</td>
         <td className="px-3 py-3 text-sm font-medium text-text-primary text-right">{formatCurrency(totalPlan)}</td>
-        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(matReal)}</td>
-        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(hhReal)}</td>
+        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(totais.matReal)}</td>
+        <td className="px-3 py-3 text-sm text-text-secondary text-right">{formatCurrency(totais.hhReal)}</td>
         <td className="px-3 py-3 text-sm font-medium text-text-primary text-right">{formatCurrency(totalReal)}</td>
         <td className={`px-3 py-3 text-sm font-medium text-right ${varClass}`}>
           {variacao > 0 ? '+' : ''}{formatCurrency(variacao)}
@@ -191,12 +215,38 @@ function LinhaAtividade({ atividade, projetoId, projetoNome }: { atividade: Ativ
   )
 }
 
-function ProjetoAtividades({ projetoId, projetoNome }: { projetoId: string; projetoNome: string }) {
+// Agrega totais de todas as atividades de um projeto
+function ProjetoAtividades({
+  projetoId,
+  projetoNome,
+  onTotaisProjeto,
+}: {
+  projetoId: string
+  projetoNome: string
+  onTotaisProjeto?: (id: string, t: { matPlan: number; matReal: number; hhPlan: number; hhReal: number }) => void
+}) {
   const { data: atividades = [] } = useAtividades(projetoId)
+  const totaisMap = useMemo(() => new Map<string, TotaisProjeto>(), [projetoId])
+
+  const reportar = (atividadeId: string, t: { matPlan: number; matReal: number; hhPlan: number; hhReal: number }) => {
+    totaisMap.set(atividadeId, t)
+    const soma = Array.from(totaisMap.values()).reduce(
+      (acc, v) => ({ matPlan: acc.matPlan + v.matPlan, matReal: acc.matReal + v.matReal, hhPlan: acc.hhPlan + v.hhPlan, hhReal: acc.hhReal + v.hhReal }),
+      { matPlan: 0, matReal: 0, hhPlan: 0, hhReal: 0 }
+    )
+    onTotaisProjeto?.(projetoId, soma)
+  }
+
   return (
     <>
       {atividades.map((a) => (
-        <LinhaAtividade key={a.id} atividade={a} projetoId={projetoId} projetoNome={projetoNome} />
+        <LinhaAtividade
+          key={a.id}
+          atividade={a}
+          projetoId={projetoId}
+          projetoNome={projetoNome}
+          onTotais={(t) => reportar(a.id, t)}
+        />
       ))}
     </>
   )
@@ -205,25 +255,48 @@ function ProjetoAtividades({ projetoId, projetoNome }: { projetoId: string; proj
 export default function CustosPage() {
   const { data: projetos = [], isLoading } = useProjeto()
   const [projetoFiltro, setProjetoFiltro] = useState<string>('todos')
+  // Mapa de totais por projeto — atualizado pelos filhos via callback
+  type TotaisProjeto = { matPlan: number; matReal: number; hhPlan: number; hhReal: number }
+const [totaisPorProjeto, setTotaisPorProjeto] = useState<Map<string, TotaisProjeto>>(new Map())
 
   const projetosFiltrados = useMemo(
     () => (projetoFiltro === 'todos' ? projetos : projetos.filter((p) => p.id === projetoFiltro)),
     [projetos, projetoFiltro]
   )
 
+
+  const handleFiltro = (v: string) => {
+    setProjetoFiltro(v)
+    setTotaisPorProjeto(new Map())
+  }
+
+  const atualizarTotaisProjeto = (id: string, t: { matPlan: number; matReal: number; hhPlan: number; hhReal: number }) => {
+    setTotaisPorProjeto((prev) => {
+      const next = new Map(prev)
+      next.set(id, t)
+      return next
+    })
+  }
+
+  // Totais dos cards = soma apenas dos projetos filtrados
   const totais = useMemo(() => {
-    const ats = projetosFiltrados.flatMap((p) => p.atividades ?? [])
-    const matPlan = ats.reduce((s, a) => s + (a.materialPlanejado ?? 0), 0)
-    const matReal = ats.reduce((s, a) => s + (a.materialReal ?? 0), 0)
-    const hhPlan = ats.reduce((s, a) => s + a.hhPlanejado, 0)
-    const hhReal = ats.reduce((s, a) => s + a.hhReal, 0)
+    const idsFiltrados = new Set(projetosFiltrados.map((p) => p.id))
+    let matPlan = 0, matReal = 0, hhPlan = 0, hhReal = 0
+    totaisPorProjeto.forEach((t, id) => {
+      if (idsFiltrados.has(id)) {
+        matPlan += t.matPlan
+        matReal += t.matReal
+        hhPlan += t.hhPlan
+        hhReal += t.hhReal
+      }
+    })
     const totalPlan = matPlan + hhPlan
     const totalReal = matReal + hhReal
     const variacao = totalReal - totalPlan
     const variacaoPerc = totalPlan > 0 ? (variacao / totalPlan) * 100 : 0
     const percRealizado = totalPlan > 0 ? Math.min((totalReal / totalPlan) * 100, 100) : 0
     return { matPlan, matReal, hhPlan, hhReal, totalPlan, totalReal, variacao, variacaoPerc, percRealizado }
-  }, [projetosFiltrados])
+  }, [totaisPorProjeto, projetosFiltrados])
 
   return (
     <div>
@@ -232,12 +305,13 @@ export default function CustosPage() {
           <h1 className="text-2xl font-bold text-text-primary">Gestão de Custos</h1>
           <p className="text-text-secondary text-sm mt-0.5">Planejado, Real e Comparativo por atividade</p>
         </div>
-        <select value={projetoFiltro} onChange={(e) => setProjetoFiltro(e.target.value)} className="input-field w-48">
+        <select value={projetoFiltro} onChange={(e) => handleFiltro(e.target.value)} className="input-field w-48">
           <option value="todos">Todos os Projetos</option>
           {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </select>
       </div>
 
+      {/* Cards do topo — alimentados pelos dados reais da tabela */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="card p-4">
           <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Custo Planejado Total</p>
@@ -324,7 +398,12 @@ export default function CustosPage() {
                     <tr><td colSpan={10} className="text-center py-10 text-text-muted text-sm">Nenhum projeto encontrado.</td></tr>
                   ) : (
                     projetosFiltrados.map((p) => (
-                      <ProjetoAtividades key={p.id} projetoId={p.id} projetoNome={p.nome} />
+                      <ProjetoAtividades
+                        key={p.id}
+                        projetoId={p.id}
+                        projetoNome={p.nome}
+                        onTotaisProjeto={atualizarTotaisProjeto}
+                      />
                     ))
                   )}
                 </tbody>
