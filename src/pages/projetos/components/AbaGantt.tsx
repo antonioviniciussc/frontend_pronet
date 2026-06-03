@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useAtividades } from '@/hooks/useProjetos'
+import { useAtividades } from '@/hooks/useAtividades'
 import type { Projeto } from '@/types/projeto'
 
 interface Props {

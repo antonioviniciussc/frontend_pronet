@@ -1,4 +1,4 @@
-import { useAtividades } from '@/hooks/useProjetos'
+import { useAtividades } from '@/hooks/useAtividades'
 import { formatCurrency } from '@/utils/formatters'
 import { Pencil } from 'lucide-react'
 import type { Projeto } from '@/types/projeto'

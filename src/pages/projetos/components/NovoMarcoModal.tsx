@@ -16,6 +16,8 @@ export default function NovoMarcoModal({ open, onClose }: Props) {
   });
   const [erro, setErro] = useState("");
 
+  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro("");
@@ -24,7 +26,8 @@ export default function NovoMarcoModal({ open, onClose }: Props) {
       return;
     }
     try {
-      await criarMarco.mutateAsync(form);
+      const response = await criarMarco.mutateAsync(form);
+      console.log(response)
       setForm({ descricao: "", data_prevista: "", data_real: "" });
       onClose();
     } catch {

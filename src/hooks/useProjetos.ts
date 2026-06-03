@@ -30,10 +30,3 @@ export function useProjetoFind(id?: string) {
     enabled: !!id,
   });
 }
-export function useAtividades(projetoId?: string) {
-  return useQuery({
-    queryKey: ["atividades", projetoId],
-    queryFn: () => projetosService.listarAtividades(String(projetoId)),
-    enabled: !!projetoId,
-  });
-}

@@ -16,8 +16,8 @@ type FormData = z.infer<typeof schema>
 interface Props {
   open: boolean
   onClose: () => void
-  projetoId: string
-  atividadeId: string
+  projetoId: number
+  atividadeId: number
 }
 
 export default function AdicionarItemModal({ open, onClose, projetoId, atividadeId }: Props) {

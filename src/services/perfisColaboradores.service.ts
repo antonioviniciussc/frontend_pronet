@@ -11,8 +11,8 @@ type ApiListResponse<T> = { data: T; total?: number }
 export const perfisColaboradoresService = {
   listar: async (): Promise<PerfilColaborador[]> => {
     const { data } = await api.get<ApiListResponse<PerfilColaborador[]>>(
-      '/perfisColaboradores/listarColaborador',
-      { params: { limit: 200 } }
+      '/perfilColaboradores/listarColaborador',
+      { params: { limit: 10 } }
     )
     return data.data ?? []
   },
