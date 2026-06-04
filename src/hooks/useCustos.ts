@@ -2,10 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { custosService } from "@/services/custos.service";
 import { materiaisService } from "@/services/materiais.service";
 import { perfisColaboradoresService } from "@/services/perfisColaboradores.service";
-import type {
-  NovoMateriaisPlanejado,
-  NovoPerfilPlanejado,
-} from "@/types/custo";
+import type { NovoMateriaisPlanejado, NovoPerfilPlanejado } from "@/types/custo";
 import api from "@/services/api";
 
 // ── Materiais planejados ────────────────────────────────────────────────────
@@ -43,42 +40,24 @@ export function useExcluirItem(_projetoId: number, atividadeId: number) {
 // ── Recursos HH planejados ──────────────────────────────────────────────────
 
 export function useRecursos(_projetoId: number, atividadeId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (dados: {
-      idPerfilColaborador: number;
-      hh_planejada: number;
-    }) => custosService.criarPerfilPlanejado(atividadeId, dados),
-
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["recursos", atividadeId],
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: ["custos-atividade", atividadeId],
-      });
+  return useQuery({
+    queryKey: ["recursos", atividadeId],
+    queryFn: async () => {
+      const result = await custosService.listarPerfisPlanejado(atividadeId);
+      console.log("RECURSOS raw:", result);
+      return result;
     },
+    enabled: !!atividadeId,
   });
 }
 
-export function useCriarRecurso(projetoId: number, atividadeId: number) {
+export function useCriarRecurso(_projetoId: number, atividadeId: number) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (dados: {
-      idPerfilColaborador: number;
-      hh_planejada: number;
-    }) => custosService.criarPerfilPlanejado(atividadeId, dados),
+    mutationFn: (dados: NovoPerfilPlanejado) =>
+      custosService.adicionarPerfilPlanejado(atividadeId, dados),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["recursos", projetoId, atividadeId],
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: ["custos-atividade", atividadeId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["recursos", atividadeId] });
     },
   });
 }
@@ -86,7 +65,8 @@ export function useCriarRecurso(projetoId: number, atividadeId: number) {
 export function useExcluirRecurso(_projetoId: number, atividadeId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (_recursoId: number) => Promise.resolve(),
+    mutationFn: (recursoId: number) =>
+      api.delete(`/atividades/perfisPlanejado/${recursoId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recursos", atividadeId] });
     },
